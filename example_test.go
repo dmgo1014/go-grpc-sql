@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	grpcsql "github.com/godror/go-grpc-sql"
-	_ "github.com/godror/godror"
+	"github.com/godror/godror"
 )
 
 func Example() {
@@ -17,12 +17,7 @@ func Example() {
 	if err != nil {
 		log.Fatalf("failed to create listener: %v", err)
 	}
-	srvDB, err := sql.Open("godror", "tiger/scott")
-	if err != nil {
-		log.Fatalf("%+v", err)
-	}
-	defer srvDB.Close()
-	server := grpcsql.NewServer(srvDB.Driver())
+	server := grpcsql.NewServer(godror.NewDriver())
 	go server.Serve(listener)
 	defer server.Stop()
 
@@ -32,29 +27,34 @@ func Example() {
 	driver := grpcsql.NewDriver(dialer)
 	sql.Register("grpc", driver)
 
-	db, err := sql.Open("grpc", ":memory:")
+	db, err := sql.Open("grpc", testDSN)
 	if err != nil {
-		log.Fatalf("failed to create grpc database: %s", err)
+		log.Fatalf("failed to create grpc database: %v", err)
 	}
 	defer db.Close()
 
 	tx, err := db.Begin()
 	if err != nil {
-		log.Fatalf("failed to create grpc transaction: %s", err)
+		log.Fatalf("failed to create grpc transaction: %v", err)
 	}
 	defer tx.Rollback()
 
-	result, err := tx.Exec("CREATE TABLE test (n INTEGER); INSERT INTO test(n) VALUES (1)")
-	if err != nil {
-		log.Fatalf("failed to execute create table statement over grpc: %s", err)
+	const tbl = "test_grpc"
+	tx.Exec("DROP TABLE " + tbl)
+	defer tx.Exec("DROP TABLE " + tbl)
+	if _, err := tx.Exec("CREATE TABLE " + tbl + " (n INTEGER)"); err != nil {
+		log.Fatalf("failed to execute create table statement over grpc: %v", err)
+	}
+	if _, err := tx.Exec("INSERT INTO " + tbl + "(n) VALUES (1)"); err != nil {
+		log.Fatalf("failed to execute INSERT statement over grpc: %v", err)
 	}
 
-	result, err = tx.Exec("INSERT INTO test(n) VALUES (2)")
+	result, err := tx.Exec("INSERT INTO " + tbl + "(n) VALUES (2)")
 	if err != nil {
-		log.Fatalf("failed to execute insert statement over grpc: %s", err)
+		log.Fatalf("failed to execute insert statement over grpc: %v", err)
 	}
 
-	rows, err := tx.Query("SELECT n FROM test ORDER BY n")
+	rows, err := tx.Query("SELECT n FROM " + tbl + " ORDER BY n")
 	if err != nil {
 		log.Fatalf("failed to select rows over grpc: %s", err)
 	}

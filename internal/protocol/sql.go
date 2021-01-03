@@ -58,8 +58,8 @@ func NewRequestStmtClose(id int64) *Request {
 }
 
 // NewRequestBegin creates a new Request of type RequestBegin.
-func NewRequestBegin() *Request {
-	return newRequest(&RequestBegin{})
+func NewRequestBegin(opts driver.TxOptions) *Request {
+	return newRequest(&RequestBegin{Isolation: int32(opts.Isolation), ReadOnly: opts.ReadOnly})
 }
 
 // NewRequestCommit creates a new Request of type RequestCommit.
@@ -430,14 +430,14 @@ func toValue(value interface{}) (Value, error) {
 
 // ToDriverValues converts a slice of protobuf Value objects to a slice of Go
 // driver.Value objects.
-func ToDriverValues(values []*Value) ([]driver.Value, error) {
+func ToDriverValues(values []*Value) ([]driver.NamedValue, error) {
 	args, err := FromValueSlice(values)
 	if err != nil {
 		return nil, err
 	}
-	a := make([]driver.Value, len(args))
+	a := make([]driver.NamedValue, len(args))
 	for i, arg := range args {
-		a[i] = arg
+		a[i] = driver.NamedValue{Ordinal: i, Value: arg}
 	}
 	return a, nil
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CanonicalLtd/go-grpc-sql/internal/protocol"
+	"github.com/godror/go-grpc-sql/internal/protocol"
 )
 
 // Marshal driver.Value slices.
@@ -59,33 +59,6 @@ func TestFromDriverValues_Error(t *testing.T) {
 			assert.EqualError(t, err, c.err)
 		})
 	}
-}
-
-// Test failure modes when unmarshalling driver.Value objects
-func TestToDriverValues_Error(t *testing.T) {
-	cases := []struct {
-		title string
-		value protocol.Value
-		err   string
-	}{
-		{
-			`invalid code`,
-			protocol.Value{Code: 666},
-			"cannot unmarshal value 0: invalid value type code 666",
-		},
-		{
-			`garbage data`,
-			protocol.Value{Code: protocol.ValueCode_INT64, Data: []byte("foo")},
-			"cannot unmarshal value 0: proto: illegal wireType 6",
-		},
-	}
-	for _, c := range cases {
-		subtest.Run(t, c.title, func(t *testing.T) {
-			_, err := protocol.ToDriverValues([]*protocol.Value{&c.value})
-			assert.EqualError(t, err, c.err)
-		})
-	}
-
 }
 
 // Marshal reflect.Type into ValueCode.

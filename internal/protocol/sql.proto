@@ -79,6 +79,8 @@ message RequestStmtClose {
 }
 
 message RequestBegin {
+  int32 isolation = 1;
+  bool read_only = 2;
 }
 
 message RequestCommit {

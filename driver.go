@@ -9,6 +9,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Driver implements the database/sql/driver interface and executes the
@@ -53,20 +54,26 @@ func dial(dialer Dialer, name string) (*Conn, error) {
 
 	// TODO: make the number of retries and timeout configurable
 	var conn *Conn
+	var lastErr error
 	for i := 0; i < 3; i++ {
 		grpcClient := protocol.NewSQLClient(grpcConn)
 		grpcConnClient, err := grpcClient.Conn(context.Background())
-		if err != nil {
-			if grpc.Code(err) == codes.Unavailable && i != 2 {
-				time.Sleep(time.Second)
-				continue
+		if err == nil {
+			lastErr = nil
+			conn = &Conn{
+				grpcConn:       grpcConn,
+				grpcConnClient: grpcConnClient,
 			}
+			break
+		}
+		if status.Code(err) != codes.Unavailable {
 			return nil, fmt.Errorf("gRPC conn method failed: %w", err)
 		}
-		conn = &Conn{
-			grpcConn:       grpcConn,
-			grpcConnClient: grpcConnClient,
-		}
+		lastErr = err
+		time.Sleep(time.Duration(i) * time.Second)
+	}
+	if lastErr != nil {
+		return nil, fmt.Errorf("gRPC conn method failed: %w", lastErr)
 	}
 
 	if _, err := conn.exec(protocol.NewRequestOpen(name)); err != nil {

@@ -2,36 +2,49 @@ package grpcsql_test
 
 import (
 	"database/sql/driver"
+	"os"
 	"testing"
+	"time"
 
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/godror/go-grpc-sql"
-	"github.com/mpvl/subtest"
+	grpcsql "github.com/godror/go-grpc-sql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var testDSN string
+
+func init() {
+	testDSN = os.Getenv("TEST_DSN")
+	if testDSN == "" {
+		panic("Set TEST_DSN environment variable to a test database connection string!")
+	}
+}
 
 // Open a new gRPC connection.
 func TestDriver_Open(t *testing.T) {
 	driver, cleanup := newDriver()
 	defer cleanup()
 
-	conn, err := driver.Open(":memory:")
+	conn, err := driver.Open(testDSN)
 	require.NoError(t, err)
 	defer conn.Close()
 }
 
 // Create a transaction and commit it.
 func TestDriver_TxCommit(t *testing.T) {
-	driver, cleanup := newDriver()
+	drv, cleanup := newDriver()
 	defer cleanup()
 
-	conn, err := driver.Open(":memory:")
+	conn, err := drv.Open(testDSN)
 	require.NoError(t, err)
 	defer conn.Close()
 
-	tx, err := conn.Begin()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	tx, err := conn.(driver.ConnBeginTx).BeginTx(ctx, driver.TxOptions{})
 	require.NoError(t, err)
 	assert.NoError(t, tx.Commit())
 }
@@ -40,7 +53,7 @@ func TestDriver_TxCommit(t *testing.T) {
 func TestDriver_BadConn(t *testing.T) {
 	drv, cleanup := newDriver()
 
-	conn, err := drv.Open(":memory:")
+	conn, err := drv.Open(testDSN)
 	assert.NoError(t, err)
 	defer conn.Close()
 
@@ -68,9 +81,12 @@ func TestDriver_OpenError(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		subtest.Run(t, c.title, func(t *testing.T) {
+		t.Run(c.title, func(t *testing.T) {
 			driver := grpcsql.NewDriver(c.dialer)
-			_, err := driver.Open(":memory:")
+			db, err := driver.Open(testDSN)
+			if db != nil {
+				db.Close()
+			}
 			require.NotNil(t, err)
 			assert.Contains(t, err.Error(), c.err)
 		})

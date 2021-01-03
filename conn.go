@@ -1,6 +1,7 @@
 package grpcsql
 
 import (
+	"context"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -11,6 +12,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+var _ = (driver.Conn)((*Conn)(nil))
+var _ = (driver.ConnBeginTx)((*Conn)(nil))
 
 // Conn wraps a connection to a gRPC SQL gateway.
 type Conn struct {
@@ -64,11 +68,13 @@ func (c *Conn) Close() error {
 	return c.grpcConn.Close()
 }
 
-// Begin starts and returns a new transaction.
-//
-// Deprecated: Drivers should implement ConnBeginTx instead (or additionally).
 func (c *Conn) Begin() (driver.Tx, error) {
-	response, err := c.exec(protocol.NewRequestBegin())
+	return c.BeginTx(context.Background(), driver.TxOptions{})
+}
+
+// BeginTx starts and returns a new transaction.
+func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	response, err := c.exec(protocol.NewRequestBegin(opts))
 	if err != nil {
 		return nil, err
 	}
