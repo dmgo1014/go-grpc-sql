@@ -1,7 +1,7 @@
 package grpcsql
 
 import (
-	"github.com/CanonicalLtd/go-grpc-sql/internal/protocol"
+	"github.com/godror/go-grpc-sql/internal/protocol"
 )
 
 // Tx is a transaction.

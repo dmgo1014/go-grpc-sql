@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CanonicalLtd/go-grpc-sql/internal/protocol"
-	"github.com/CanonicalLtd/go-sqlite3"
+	"github.com/godror/go-grpc-sql/internal/protocol"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
@@ -17,6 +16,7 @@ import (
 type Gateway struct {
 	driver driver.Driver // Underlying SQL driver.
 	conn   *gatewayConn
+	protocol.UnimplementedSQLServer
 }
 
 // NewGateway creates a new gRPC gateway executing requests against the given
@@ -45,20 +45,11 @@ func (s *Gateway) Conn(stream protocol.SQL_ConnServer) error {
 		response, err := s.conn.handle(request)
 		if err != nil {
 			// TODO: add support for more driver-specific errors.
-			switch err := err.(type) {
-			case sqlite3.Error:
-				response = protocol.NewResponseSQLiteError(
-					err.Code, err.ExtendedCode, err.Error())
-			case sqlite3.ErrNo:
-				response = protocol.NewResponseSQLiteError(
-					err, 0, err.Error())
-			default:
-				return errors.Wrapf(err, "failed to handle %s request", request.Code)
-			}
+			return fmt.Errorf("failed to handle %s request: %w", request.Code, err)
 		}
 
 		if err := stream.Send(response); err != nil {
-			return errors.Wrapf(err, "failed to send response")
+			return fmt.Errorf("failed to send response: %w", err)
 		}
 	}
 }

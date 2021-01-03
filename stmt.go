@@ -3,7 +3,7 @@ package grpcsql
 import (
 	"database/sql/driver"
 
-	"github.com/CanonicalLtd/go-grpc-sql/internal/protocol"
+	"github.com/godror/go-grpc-sql/internal/protocol"
 )
 
 // Stmt is a prepared statement. It is bound to a Conn and not

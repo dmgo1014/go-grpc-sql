@@ -8,8 +8,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/CanonicalLtd/go-grpc-sql"
-	"github.com/CanonicalLtd/go-sqlite3"
+	grpcsql "github.com/godror/go-grpc-sql"
+	_ "github.com/godror/godror"
 )
 
 func Example() {
@@ -17,7 +17,12 @@ func Example() {
 	if err != nil {
 		log.Fatalf("failed to create listener: %v", err)
 	}
-	server := grpcsql.NewServer(&sqlite3.SQLiteDriver{})
+	srvDB, err := sql.Open("godror", "tiger/scott")
+	if err != nil {
+		log.Fatalf("%+v", err)
+	}
+	defer srvDB.Close()
+	server := grpcsql.NewServer(srvDB.Driver())
 	go server.Serve(listener)
 	defer server.Stop()
 

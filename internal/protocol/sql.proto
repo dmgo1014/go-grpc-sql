@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protocol;
 
+option go_package = "github,com/godror/go-grpc-sql/internal/protocol";
+
 // Interface exported by a gRPC SQL gateway.
 service SQL {
   rpc Conn(stream Request) returns (stream Response);
@@ -32,7 +34,7 @@ enum RequestCode {
   CONN_EXEC                      = 13;
 
   // XXX error codes should be part of a separate ResponseCode enum.
-  SQLITE_ERROR = 14;
+  SQL_ERROR = 14;
 }
 
 message RequestOpen {
@@ -151,7 +153,7 @@ message ResponseRollback {
 message ResponseClose {
 }
 
-message ResponseSQLiteError {
+message ResponseSQLError {
   int32 code = 1;
   int32 extended_code = 2;
   string err = 3;
@@ -161,7 +163,12 @@ message ResponseSQLiteError {
 // Value of a single statement argument or row column.
 message Value {
   ValueCode code = 1; // Code identifying the type of the value, see below.
-  bytes data = 2;     // Serialized value, maps to one of the ValueXXX messages.
+  string text = 2;
+  int64 int64 = 3;
+  double float64 = 4;
+  bytes bytes = 5;
+  int64 time = 6;
+  bool bool = 7;
 }
 
 // ValueCode is a numberic code identifying the Go type of a value.
@@ -175,31 +182,4 @@ enum ValueCode {
   STRING  = 4;
   TIME    = 5;
   NULL    = 6;
-}
-
-message ValueInt64 {
-  int64 value = 1;
-}
-
-message ValueFloat64 {
-  double value = 1;
-}
-
-message ValueBool {
-  bool value = 1;
-}
-
-message ValueBytes {
-  bytes value = 1;
-}
-
-message ValueString {
-  string value = 1;
-}
-
-message ValueTime {
-  int64 value = 1;
-}
-
-message ValueNull {
 }

@@ -1,14 +1,15 @@
 package grpcsql_test
 
 import (
+	"database/sql"
 	"fmt"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/CanonicalLtd/go-grpc-sql"
-	"github.com/CanonicalLtd/go-grpc-sql/internal/protocol"
-	"github.com/CanonicalLtd/go-sqlite3"
+	"github.com/godror/go-grpc-sql"
+	grpcsql "github.com/godror/go-grpc-sql"
+	"github.com/godror/go-grpc-sql/internal/protocol"
 	"github.com/mpvl/subtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,7 +66,7 @@ func TestGateway_ConnError(t *testing.T) {
 }
 
 // Create a new protocol.SQL_ConnClient stream connected to a Gateway backed by
-// a SQLite driver.
+// a godror driver.
 func newGatewayClient() (protocol.SQL_ConnClient, func()) {
 	server, address := newGatewayServer()
 
@@ -91,7 +92,7 @@ func newGatewayClient() (protocol.SQL_ConnClient, func()) {
 }
 
 // Create a new test gRPC server attached to a grpc-sql gateway backed by a
-// SQLite driver.
+// godror driver.
 //
 // Return the newly created server and its network address.
 func newGatewayServer() (*grpc.Server, string) {
@@ -99,7 +100,12 @@ func newGatewayServer() (*grpc.Server, string) {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create listener: %v", err))
 	}
-	server := grpcsql.NewServer(&sqlite3.SQLiteDriver{})
+	srvDB, err := sql.Open("godror", "scott/tiger")
+	if err != nil {
+		return err
+	}
+	defer srvDB.Close()
+	server := grpcsql.NewServer(srvDB.Driver())
 	go server.Serve(listener)
 	return server, listener.Addr().String()
 }

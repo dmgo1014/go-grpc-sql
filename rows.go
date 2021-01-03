@@ -5,7 +5,7 @@ import (
 	"io"
 	"reflect"
 
-	"github.com/CanonicalLtd/go-grpc-sql/internal/protocol"
+	"github.com/godror/go-grpc-sql/internal/protocol"
 )
 
 // Rows is an iterator over an executed query's results.

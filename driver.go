@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"time"
 
-	"github.com/CanonicalLtd/go-grpc-sql/internal/protocol"
+	"github.com/godror/go-grpc-sql/internal/protocol"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"

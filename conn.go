@@ -4,8 +4,7 @@ import (
 	"database/sql/driver"
 	"io"
 
-	"github.com/CanonicalLtd/go-grpc-sql/internal/protocol"
-	sqlite3 "github.com/CanonicalLtd/go-sqlite3"
+	"github.com/godror/go-grpc-sql/internal/protocol"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -97,12 +96,9 @@ func (c *Conn) exec(request *protocol.Request) (*protocol.Response, error) {
 		return nil, c.errorf(err, "gRPC %s response error", request.Code)
 	}
 	switch response.Code {
-	case protocol.RequestCode_SQLITE_ERROR:
-		err := response.SQLiteError()
-		if err.ExtendedCode == sqlite3.ErrIoErrNotLeader || err.ExtendedCode == sqlite3.ErrIoErrLeadershipLost {
-			return nil, driver.ErrBadConn
-		}
-		return nil, response.SQLiteError()
+	case protocol.RequestCode_SQL_ERROR:
+		err := response.SQLError()
+		return nil, err
 	}
 	return response, nil
 }

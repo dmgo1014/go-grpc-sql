@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"reflect"
 	"time"
-	"unsafe"
 
-	"github.com/CanonicalLtd/go-sqlite3"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
+
+//go:generate go install google.golang.org/protobuf/cmd/protoc-gen-go google.golang.org/grpc/cmd/protoc-gen-go-grpc
+//go:generate protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=.  --go-grpc_opt=paths=source_relative sql.proto
 
 // NewRequestOpen creates a new Request of type RequestOpen.
 func NewRequestOpen(name string) *Request {
@@ -208,11 +209,11 @@ func NewResponseClose() *Response {
 	return newResponse(&ResponseClose{})
 }
 
-// NewResponseSQLiteError creates a new Response of type ResponseSQLiteError.
-func NewResponseSQLiteError(code sqlite3.ErrNo, extendedCode sqlite3.ErrNoExtended, err string) *Response {
-	return newResponse(&ResponseSQLiteError{
-		Code:         int32(code),
-		ExtendedCode: int32(extendedCode),
+// NewResponseSQLError creates a new Response of type ResponseSQLError.
+func NewResponseSQLError(code, extendedCode int32, err string) *Response {
+	return newResponse(&ResponseSQLError{
+		Code:         code,
+		ExtendedCode: extendedCode,
 		Err:          err,
 	})
 }
@@ -266,27 +267,11 @@ func (r *Response) Begin() *ResponseBegin {
 	return message
 }
 
-// SQLiteError returns a ResponseSQLiteError payload.
-func (r *Response) SQLiteError() sqlite3.Error {
-	message := &ResponseSQLiteError{}
+// SQLError returns a ResponseSQLError payload.
+func (r *Response) SQLError() *ResponseSQLError {
+	message := &ResponseSQLError{}
 	r.unmarshal(message)
-
-	// FIXME: unfortunately the err attribute of sqlite3.Error is private,
-	// so it's not possible to instantiate a sqlite3.Error with a custom
-	// error string, so we create a structure which exactly the same as
-	// sqlite3.Error and conver it to sqlite3.Error using the unsafe
-	// package.
-	err := struct {
-		Code         int
-		ExtendedCode int
-		err          string
-	}{
-		Code:         int(message.Code),
-		ExtendedCode: int(message.ExtendedCode),
-		err:          message.Err,
-	}
-
-	return *(*sqlite3.Error)(unsafe.Pointer(&err))
+	return message
 }
 
 func (r *Response) unmarshal(message proto.Message) {
@@ -325,8 +310,8 @@ func newResponse(message proto.Message) *Response {
 		code = RequestCode_STMT_CLOSE
 	case *ResponseClose:
 		code = RequestCode_CLOSE
-	case *ResponseSQLiteError:
-		code = RequestCode_SQLITE_ERROR
+	case *ResponseSQLError:
+		code = RequestCode_SQL_ERROR
 	default:
 		panic(fmt.Errorf("invalid message type"))
 	}
@@ -353,15 +338,15 @@ func FromDriverValues(objects []driver.Value) ([]*Value, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot marshal object %d (%v): %s", i, object, err)
 		}
-		values[i] = value
+		values[i] = &value
 	}
 	return values, nil
 }
 
 // ToValueSlice converts a slice of Go objects of supported types to a slice of
 // protobuf Value objects.
-func ToValueSlice(objects []interface{}) ([]*Value, error) {
-	values := make([]*Value, len(objects))
+func ToValueSlice(objects []interface{}) ([]Value, error) {
+	values := make([]Value, len(objects))
 	for i, object := range objects {
 		value, err := toValue(object)
 		if err != nil {
@@ -421,42 +406,26 @@ func FromValueCode(code ValueCode) reflect.Type {
 }
 
 // Convert a Go object of a supported type to a protobuf Value object.
-func toValue(value interface{}) (*Value, error) {
-	var code ValueCode
-	var message proto.Message
-
+func toValue(value interface{}) (Value, error) {
 	switch v := value.(type) {
 	case int64:
-		code = ValueCode_INT64
-		message = &ValueInt64{Value: v}
+		return Value{Code: ValueCode_INT64, Int64: v}, nil
 	case float64:
-		code = ValueCode_FLOAT64
-		message = &ValueFloat64{Value: v}
+		return Value{Code: ValueCode_FLOAT64, Float64: v}, nil
 	case bool:
-		code = ValueCode_BOOL
-		message = &ValueBool{Value: v}
+		return Value{Code: ValueCode_BOOL, Bool: v}, nil
 	case []byte:
-		code = ValueCode_BYTES
-		message = &ValueBytes{Value: v}
+		return Value{Code: ValueCode_BYTES, Bytes: v}, nil
 	case string:
-		code = ValueCode_STRING
-		message = &ValueString{Value: v}
+		return Value{Code: ValueCode_STRING, Text: v}, nil
 	case time.Time:
-		code = ValueCode_TIME
-		message = &ValueTime{Value: v.Unix()}
+		return Value{Code: ValueCode_TIME, Time: v.Unix()}, nil
 	default:
 		if value != nil {
-			return nil, fmt.Errorf("invalid type %s", reflect.TypeOf(value).Kind())
+			return Value{Code: ValueCode_NULL}, fmt.Errorf("invalid type %s", reflect.TypeOf(value).Kind())
 		}
-		code = ValueCode_NULL
-		message = &ValueNull{}
+		return Value{Code: ValueCode_NULL}, nil
 	}
-
-	data, err := proto.Marshal(message)
-	if err != nil {
-		return nil, err
-	}
-	return &Value{Code: code, Data: data}, nil
 }
 
 // ToDriverValues converts a slice of protobuf Value objects to a slice of Go
@@ -478,83 +447,39 @@ func ToDriverValues(values []*Value) ([]driver.Value, error) {
 func FromValueSlice(values []*Value) ([]interface{}, error) {
 	objects := make([]interface{}, len(values))
 	for i, value := range values {
-		object, err := fromValue(value)
-		if err != nil {
-			return nil, fmt.Errorf("cannot unmarshal value %d: %s", i, err)
-		}
-		objects[i] = object
+		objects[i] = value.Interface()
 	}
 	return objects, nil
 }
 
-// Convert a protobuf Value object to a Go interface object.
-func fromValue(value *Value) (interface{}, error) {
-	var message valueMessage
-	switch value.Code {
-	case ValueCode_INT64:
-		message = &ValueInt64{}
-	case ValueCode_FLOAT64:
-		message = &ValueFloat64{}
-	case ValueCode_BOOL:
-		message = &ValueBool{}
-	case ValueCode_BYTES:
-		message = &ValueBytes{}
-	case ValueCode_STRING:
-		message = &ValueString{}
-	case ValueCode_TIME:
-		message = &ValueTime{}
+// Interface implements valueMessage.
+func (v *Value) Interface() interface{} {
+	if v == nil {
+		return nil
+	}
+	switch v.Code {
 	case ValueCode_NULL:
-		message = &ValueNull{}
+		return nil
+	case ValueCode_INT64:
+		return v.Int64
+	case ValueCode_FLOAT64:
+		return v.Float64
+	case ValueCode_BOOL:
+		return v.Bool
+	case ValueCode_BYTES:
+		return v.Bytes
+	case ValueCode_STRING:
+		return v.Text
+	case ValueCode_TIME:
+		return time.Unix(v.Time, 0)
 	default:
-		return nil, fmt.Errorf("invalid value type code %d", value.Code)
+		panic(fmt.Errorf("unknown ValueCode %d", v.Code))
 	}
+}
 
-	err := proto.Unmarshal(value.Data, message)
-	if err != nil {
-		return nil, err
+func (sqle *ResponseSQLError) Error() string {
+	if sqle == nil {
+		return ""
 	}
-
-	return message.Interface(), nil
-}
-
-// Interface implemented by the various ValueXXX objects, that returns the
-// underlying value as interface{}.
-type valueMessage interface {
-	proto.Message
-	Interface() interface{}
-}
-
-// Interface implements valueMessage.
-func (v *ValueInt64) Interface() interface{} {
-	return v.Value
-}
-
-// Interface implements valueMessage.
-func (v *ValueFloat64) Interface() interface{} {
-	return v.Value
-}
-
-// Interface implements valueMessage.
-func (v *ValueBool) Interface() interface{} {
-	return v.Value
-}
-
-// Interface implements valueMessage.
-func (v *ValueBytes) Interface() interface{} {
-	return v.Value
-}
-
-// Interface implements valueMessage.
-func (v *ValueString) Interface() interface{} {
-	return v.Value
-}
-
-// Interface implements valueMessage.
-func (v *ValueTime) Interface() interface{} {
-	return time.Unix(v.Value, 0)
-}
-
-// Interface implements valueMessage.
-func (v *ValueNull) Interface() interface{} {
-	return nil
+	return fmt.Sprintf("%d[%d]: %s", sqle.Code, sqle.ExtendedCode, sqle.Err)
 }
