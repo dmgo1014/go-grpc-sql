@@ -1,3 +1,8 @@
+// Copyright 2021 The Godror Authors.
+// Copyright 2017, 2018 Canonical Ltd.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 package grpcsql_test
 
 import (

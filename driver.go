@@ -1,3 +1,9 @@
+// Copyright 2021 The Godror Authors.
+// Copyright 2017, 2018 Canonical Ltd.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+// Package grpcsql exposes a SQL database over a gRPC endpoint.
 package grpcsql
 
 import (
