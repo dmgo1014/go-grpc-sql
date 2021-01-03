@@ -2,10 +2,11 @@ package grpcsql
 
 import (
 	"database/sql/driver"
+	"errors"
+	"fmt"
 	"io"
 
 	"github.com/godror/go-grpc-sql/internal/protocol"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -110,7 +111,7 @@ func (c *Conn) errorf(err error, format string, v ...interface{}) error {
 		c.grpcConnDoomed = true
 		return driver.ErrBadConn
 	}
-	return errors.Wrapf(err, format, v...)
+	return fmt.Errorf(format+": %w", append(v, err)...)
 }
 
 func isBadConn(err error) bool {
@@ -128,11 +129,7 @@ func isBadConn(err error) bool {
 			return true
 		}
 	}
-	cause := errors.Cause(err)
-	if cause == io.EOF {
-		return true
-	}
-	return false
+	return errors.Is(err, io.EOF)
 }
 
 const grpcNoErrorMessage = "stream terminated by RST_STREAM with error code: NO_ERROR"
