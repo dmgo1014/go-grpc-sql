@@ -442,6 +442,22 @@ func ToDriverValues(values []*Value) ([]driver.NamedValue, error) {
 	return a, nil
 }
 
+// ToDriverValues converts a slice of protobuf Value objects to a slice of Go
+// driver.Value objects.
+func ToDriverValuesInt(values []*Value) ([]interface{}, error) {
+	a := make([]interface{}, len(values))
+	for i, arg := range values {
+		if arg.Text != "" {
+			text := arg.Text
+			a[i] = text
+		} else {
+			a[i] = driver.NamedValue{Ordinal: i, Value: arg}
+		}
+
+	}
+	return a, nil
+}
+
 // FromValueSlice converts a slice of protobuf Value objects to a slice of Go
 // interface{} objects.
 func FromValueSlice(values []*Value) ([]interface{}, error) {

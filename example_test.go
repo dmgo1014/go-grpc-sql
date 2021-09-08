@@ -45,11 +45,7 @@ func Example() {
 	defer tx.Rollback()
 
 	const tbl = "test_grpc"
-	tx.Exec("DROP TABLE " + tbl)
-	defer tx.Exec("DROP TABLE " + tbl)
-	if _, err := tx.Exec("CREATE TABLE " + tbl + " (n INTEGER)"); err != nil {
-		log.Fatalf("failed to execute create table statement over grpc: %v", err)
-	}
+
 	if _, err := tx.Exec("INSERT INTO " + tbl + "(n) VALUES (1)"); err != nil {
 		log.Fatalf("failed to execute INSERT statement over grpc: %v", err)
 	}
@@ -59,7 +55,7 @@ func Example() {
 		log.Fatalf("failed to execute insert statement over grpc: %v", err)
 	}
 
-	rows, err := tx.Query("SELECT n FROM " + tbl + " ORDER BY n")
+	rows, err := tx.Query(`SELECT N "N" FROM ` + tbl + ` ORDER BY n`)
 	if err != nil {
 		log.Fatalf("failed to select rows over grpc: %s", err)
 	}
@@ -73,9 +69,9 @@ func Example() {
 		log.Fatalf("failed to fetch column types over grpc: %s", err)
 	}
 
-	numbers := []int{}
+	var numbers = []n{}
 	for rows.Next() {
-		var n int
+		var n n
 		if err := rows.Scan(&n); err != nil {
 			log.Fatalf("failed to scan row over grpc: %s", err)
 		}
@@ -95,4 +91,8 @@ func Example() {
 	fmt.Println(result.RowsAffected())
 	fmt.Println(name)
 	fmt.Println(numbers)
+}
+
+type n struct {
+	N int `db:N`
 }

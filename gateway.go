@@ -148,8 +148,7 @@ func (c *gatewayConn) handle(request *protocol.Request) (*protocol.Response, err
 		return nil, fmt.Errorf("expected OPEN request, got %s", request.Code)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
 	switch r := message.(type) {
 	case *protocol.RequestOpen:
 		return c.handleOpen(ctx, r)
@@ -428,7 +427,7 @@ func (c *gatewayConn) handleBegin(ctx context.Context, request *protocol.Request
 	go func(tx driver.Tx, serial int64, ch chan struct{}) {
 		select {
 		case <-ch:
-		case <-time.After(5 * time.Second):
+		case <-time.After(55 * time.Second):
 			c.rollback()
 		}
 	}(driverTx, c.serial, c.txCh)
@@ -563,8 +562,9 @@ func (c *gatewayConn) handleConnExec(ctx context.Context, request *protocol.Requ
 		return nil, err
 	}
 
+	// TODO will be handled by sqlz
 	lastInsertID, err := result.LastInsertId()
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "LastInsertId is not supported by this driver") {
 		c.abort()
 		return nil, err
 	}

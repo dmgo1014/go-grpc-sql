@@ -39,6 +39,9 @@ func (r *Rows) Close() error {
 //
 // Next should return io.EOF when there are no more rows.
 func (r *Rows) Next(dest []driver.Value) error {
+
+	// TODO here!!!! we should have smth like in 	/Users/dgodyna/go/pkg/mod/github.com/jackc/pgx/v4@v4.13.0/stdlib/sql.go:592
+
 	response, err := r.conn.exec(protocol.NewRequestNext(r.id, int64(len(dest))))
 	if err != nil {
 		return err
@@ -48,7 +51,7 @@ func (r *Rows) Next(dest []driver.Value) error {
 		return io.EOF
 	}
 
-	values, err := protocol.ToDriverValues(response.Next().Values)
+	values, err := protocol.ToDriverValuesInt(response.Next().Values)
 	if err != nil {
 		return err
 	}

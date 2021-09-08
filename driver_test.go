@@ -7,7 +7,6 @@ package grpcsql_test
 
 import (
 	"database/sql/driver"
-	"os"
 	"testing"
 	"time"
 
@@ -22,10 +21,7 @@ import (
 var testDSN string
 
 func init() {
-	testDSN = os.Getenv("TEST_DSN")
-	if testDSN == "" {
-		panic("Set TEST_DSN environment variable to a test database connection string!")
-	}
+	testDSN = `user="geneva_admin" password="geneva_admin" connectString="10.109.3.190:1521/RBMBE01"`
 }
 
 // Open a new gRPC connection.
